@@ -59,3 +59,28 @@ src/main/kotlin/com/example/eventdriven/
 ```bash
 ./gradlew build
 ```
+
+## Frontend (Vue 3 + TypeScript)
+
+A Vite-based web UI lives in `frontend/`. It lists tasks, creates them, and
+changes their status — each action hits the Task REST API and triggers a
+domain event on the backend.
+
+```bash
+cd frontend
+npm install
+npm run dev      # http://localhost:5173 (proxies /api -> http://localhost:8080)
+```
+
+Run the Spring Boot app (`./gradlew bootRun`) alongside it. Other scripts:
+`npm run build` (type-check + production build to `dist/`), `npm run type-check`.
+
+```
+frontend/src/
+├── App.vue                 # page shell, loads/creates/updates tasks
+├── api/tasks.ts            # typed fetch client for /api/tasks
+├── types.ts                # Task / TaskStatus mirrors of the backend model
+└── components/
+    ├── TaskForm.vue        # create-task form
+    └── TaskItem.vue        # task row with status selector
+```
