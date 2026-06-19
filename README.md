@@ -35,6 +35,32 @@ curl -X POST http://localhost:8080/api/events \
 
 Watch the app log for: `Received event: id=..., type=order.created, payload=order-42`.
 
+## Domain events
+
+The `Task` aggregate raises domain events that flow through an internal,
+in-process bus — no broker involved:
+
+```
+TaskService.create() / changeStatus()
+    → DomainEventBus.publish(TaskCreated | TaskStatusChanged)   [internal bus]
+    → SpringDomainEventBus (ApplicationEventPublisher)
+    → DomainEventLogConsumer.@EventListener
+    → logs/domain-events.log                                    [consumer: file only]
+```
+
+The consumer's sole job is to append each event to `logs/domain-events.log`
+(configured in `logback-spring.xml`, `additivity="false"` so events do not go
+to the console). Exercise it via the Task endpoints and tail the file:
+
+```bash
+curl -X POST http://localhost:8080/api/tasks \
+  -H 'Content-Type: application/json' -d '{"title":"write docs"}'
+tail -f logs/domain-events.log
+```
+
+> The standalone RabbitMQ demo (`/api/events`) is independent and still uses the
+> broker; only the Task domain-event path was switched to the log-file consumer.
+
 ## Other endpoints
 
 - H2 console: http://localhost:8080/h2-console (JDBC URL `jdbc:h2:mem:eventdriven`, user `sa`)

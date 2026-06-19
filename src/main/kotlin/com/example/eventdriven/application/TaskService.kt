@@ -2,9 +2,9 @@ package com.example.eventdriven.application
 
 import com.example.eventdriven.domain.Task
 import com.example.eventdriven.domain.TaskStatus
+import com.example.eventdriven.domain.event.DomainEventBus
 import com.example.eventdriven.domain.event.TaskCreated
 import com.example.eventdriven.domain.event.TaskStatusChanged
-import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
 import java.time.Instant
 import java.util.UUID
@@ -12,19 +12,19 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Application service for the Task aggregate. Mutations raise domain events
- * in-process via Spring's ApplicationEventPublisher.
+ * onto the internal [DomainEventBus]; consumers react in-process.
  *
  * Storage is an in-memory map for now (no persistence layer wired yet).
  */
 @Service
-class TaskService(private val events: ApplicationEventPublisher) {
+class TaskService(private val bus: DomainEventBus) {
 
     private val store = ConcurrentHashMap<UUID, Task>()
 
     fun create(title: String, description: String? = null): Task {
         val task = Task(title = title, description = description)
         store[task.id] = task
-        events.publishEvent(TaskCreated(taskId = task.id, title = task.title, status = task.status))
+        bus.publish(TaskCreated(taskId = task.id, title = task.title, status = task.status))
         return task
     }
 
@@ -33,7 +33,7 @@ class TaskService(private val events: ApplicationEventPublisher) {
         if (current.status == to) return current
         val updated = current.copy(status = to, updatedAt = Instant.now())
         store[id] = updated
-        events.publishEvent(TaskStatusChanged(taskId = id, from = current.status, to = to))
+        bus.publish(TaskStatusChanged(taskId = id, from = current.status, to = to))
         return updated
     }
 
