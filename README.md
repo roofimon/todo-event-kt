@@ -1,0 +1,61 @@
+# event-driven
+
+Spring Boot + Kotlin event-driven service skeleton.
+
+- **Spring Boot** 4.1.0 / **Kotlin** 2.3.21 / **Java** 21 (Gradle Kotlin DSL)
+- **Spring Web** (REST), **Spring AMQP** (RabbitMQ), **H2** (in-memory)
+
+## Run
+
+Start RabbitMQ (e.g. via Docker):
+
+```bash
+docker run -d --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3-management
+```
+
+Then run the app:
+
+```bash
+./gradlew bootRun
+```
+
+Connection settings are overridable via env vars: `RABBITMQ_HOST`, `RABBITMQ_PORT`,
+`RABBITMQ_USER`, `RABBITMQ_PASSWORD` (defaults: `localhost:5672`, `guest`/`guest`).
+
+## Try the event flow
+
+Publish an event over REST; it is sent to the `events.exchange` topic exchange,
+routed to `events.queue`, and logged by `EventListener`:
+
+```bash
+curl -X POST http://localhost:8080/api/events \
+  -H 'Content-Type: application/json' \
+  -d '{"type":"order.created","payload":"order-42"}'
+```
+
+Watch the app log for: `Received event: id=..., type=order.created, payload=order-42`.
+
+## Other endpoints
+
+- H2 console: http://localhost:8080/h2-console (JDBC URL `jdbc:h2:mem:eventdriven`, user `sa`)
+- RabbitMQ management UI: http://localhost:15672 (guest/guest)
+
+## Layout
+
+```
+src/main/kotlin/com/example/eventdriven/
+├── EventDrivenApplication.kt   # entry point
+├── messaging/
+│   ├── EventMessage.kt          # the event payload (JSON over AMQP)
+│   ├── MessagingConfig.kt       # exchange, queue, binding, JSON converter
+│   ├── EventPublisher.kt        # convertAndSend wrapper
+│   └── EventListener.kt         # @RabbitListener consumer
+└── web/
+    └── EventController.kt        # POST /api/events -> publish
+```
+
+## Build & test
+
+```bash
+./gradlew build
+```
