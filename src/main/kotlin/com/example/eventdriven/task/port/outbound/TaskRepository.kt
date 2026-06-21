@@ -1,5 +1,6 @@
 package com.example.eventdriven.task.port.outbound
 
+import arrow.core.Option
 import com.example.eventdriven.task.domain.Task
 import java.util.UUID
 
@@ -9,6 +10,6 @@ import java.util.UUID
  */
 interface TaskRepository {
     fun save(task: Task): Task
-    fun findById(id: UUID): Task?
+    fun findById(id: UUID): Option<Task>
     fun findAll(): List<Task>
 }

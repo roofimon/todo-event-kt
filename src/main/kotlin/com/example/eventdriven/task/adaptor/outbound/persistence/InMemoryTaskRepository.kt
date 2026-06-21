@@ -1,5 +1,6 @@
 package com.example.eventdriven.task.adaptor.outbound.persistence
 
+import arrow.core.Option
 import com.example.eventdriven.task.domain.Task
 import com.example.eventdriven.task.port.outbound.TaskRepository
 import org.springframework.stereotype.Repository
@@ -20,7 +21,7 @@ class InMemoryTaskRepository : TaskRepository {
         return task
     }
 
-    override fun findById(id: UUID): Task? = store[id]
+    override fun findById(id: UUID): Option<Task> = Option.fromNullable(store[id])
 
     override fun findAll(): List<Task> = store.values.toList()
 }

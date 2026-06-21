@@ -19,6 +19,7 @@ repositories {
 }
 
 dependencies {
+	implementation("io.arrow-kt:arrow-core:2.1.2")
 	implementation("org.springframework.boot:spring-boot-h2console")
 	implementation("org.springframework.boot:spring-boot-starter-amqp")
 	implementation("org.springframework.boot:spring-boot-starter-webmvc")
@@ -26,6 +27,9 @@ dependencies {
 	implementation("tools.jackson.module:jackson-module-kotlin")
 	runtimeOnly("com.h2database:h2")
 	testImplementation("org.springframework.boot:spring-boot-starter-amqp-test")
+	testImplementation("org.springframework.boot:spring-boot-resttestclient")
+	testImplementation("org.springframework.boot:spring-boot-restclient")
+	testImplementation("org.apache.httpcomponents.client5:httpclient5")
 	testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
 	testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")

@@ -1,7 +1,10 @@
 package com.example.eventdriven.task.application
 
+import arrow.core.Either
+import arrow.core.Option
 import com.example.eventdriven.infra.event.DomainEventBus
 import com.example.eventdriven.task.domain.Task
+import com.example.eventdriven.task.domain.TaskError
 import com.example.eventdriven.task.domain.TaskStatus
 import com.example.eventdriven.task.port.inbound.TaskUseCase
 import com.example.eventdriven.task.port.outbound.TaskRepository
@@ -27,15 +30,17 @@ class TaskService(
         return task
     }
 
-    override fun changeStatus(id: UUID, to: TaskStatus): Task {
-        val current = repository.findById(id) ?: throw NoSuchElementException("Task not found: $id")
-        val updated = current.changeStatus(to)
-        repository.save(updated)
-        updated.pullEvents().forEach(bus::publish)
-        return updated
-    }
+    override fun changeStatus(id: UUID, to: TaskStatus): Either<TaskError, Task> =
+        repository.findById(id)
+            .toEither { TaskError.NotFound(id) }
+            .map { current ->
+                current.changeStatus(to).also { updated ->
+                    repository.save(updated)
+                    updated.pullEvents().forEach(bus::publish)
+                }
+            }
 
-    override fun get(id: UUID): Task? = repository.findById(id)
+    override fun get(id: UUID): Option<Task> = repository.findById(id)
 
     override fun all(): List<Task> = repository.findAll()
 }

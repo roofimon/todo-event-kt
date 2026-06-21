@@ -32,16 +32,13 @@ class TaskController(private val service: TaskUseCase) {
 
     @GetMapping("/{id}")
     fun get(@PathVariable id: UUID): ResponseEntity<Task> =
-        service.get(id)?.let { ResponseEntity.ok(it) } ?: ResponseEntity.notFound().build()
+        service.get(id).fold({ ResponseEntity.notFound().build() }, { ResponseEntity.ok(it) })
 
     @PatchMapping("/{id}/status")
     fun changeStatus(
         @PathVariable id: UUID,
         @RequestBody request: ChangeStatusRequest,
     ): ResponseEntity<Task> =
-        try {
-            ResponseEntity.ok(service.changeStatus(id, request.status))
-        } catch (e: NoSuchElementException) {
-            ResponseEntity.notFound().build()
-        }
+        service.changeStatus(id, request.status)
+            .fold({ ResponseEntity.notFound().build() }, { ResponseEntity.ok(it) })
 }
