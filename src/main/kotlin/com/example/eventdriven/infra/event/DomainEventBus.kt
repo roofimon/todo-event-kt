@@ -1,4 +1,4 @@
-package com.example.eventdriven.domain.event
+package com.example.eventdriven.infra.event
 
 /**
  * Internal (in-process) event bus. Aggregates publish domain events here;

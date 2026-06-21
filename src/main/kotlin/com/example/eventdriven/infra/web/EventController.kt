@@ -1,7 +1,7 @@
-package com.example.eventdriven.web
+package com.example.eventdriven.infra.web
 
-import com.example.eventdriven.messaging.EventMessage
-import com.example.eventdriven.messaging.EventPublisher
+import com.example.eventdriven.infra.messaging.EventMessage
+import com.example.eventdriven.infra.messaging.EventPublisher
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.PostMapping

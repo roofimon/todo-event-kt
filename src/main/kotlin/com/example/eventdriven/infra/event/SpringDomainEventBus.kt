@@ -1,7 +1,5 @@
-package com.example.eventdriven.eventbus
+package com.example.eventdriven.infra.event
 
-import com.example.eventdriven.domain.event.DomainEvent
-import com.example.eventdriven.domain.event.DomainEventBus
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Component
 

@@ -1,4 +1,4 @@
-package com.example.eventdriven.messaging
+package com.example.eventdriven.infra.messaging
 
 import org.slf4j.LoggerFactory
 import org.springframework.amqp.rabbit.annotation.RabbitListener

@@ -1,4 +1,4 @@
-package com.example.eventdriven.domain.event
+package com.example.eventdriven.infra.event
 
 import java.time.Instant
 import java.util.UUID

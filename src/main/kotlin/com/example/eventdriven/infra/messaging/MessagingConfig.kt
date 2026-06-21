@@ -1,4 +1,4 @@
-package com.example.eventdriven.messaging
+package com.example.eventdriven.infra.messaging
 
 import org.springframework.amqp.core.Binding
 import org.springframework.amqp.core.BindingBuilder

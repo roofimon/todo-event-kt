@@ -1,8 +1,8 @@
-package com.example.eventdriven.web
+package com.example.eventdriven.task.adaptor.inbound.web
 
-import com.example.eventdriven.application.TaskService
-import com.example.eventdriven.domain.Task
-import com.example.eventdriven.domain.TaskStatus
+import com.example.eventdriven.task.domain.Task
+import com.example.eventdriven.task.domain.TaskStatus
+import com.example.eventdriven.task.port.inbound.TaskUseCase
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
@@ -19,7 +19,7 @@ data class ChangeStatusRequest(val status: TaskStatus)
 
 @RestController
 @RequestMapping("/api/tasks")
-class TaskController(private val service: TaskService) {
+class TaskController(private val service: TaskUseCase) {
 
     @PostMapping
     fun create(@RequestBody request: CreateTaskRequest): ResponseEntity<Task> {

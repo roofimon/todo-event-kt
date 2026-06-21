@@ -1,6 +1,6 @@
-package com.example.eventdriven.eventlog
+package com.example.eventdriven.infra.eventlog
 
-import com.example.eventdriven.domain.event.DomainEvent
+import com.example.eventdriven.infra.event.DomainEvent
 import org.slf4j.LoggerFactory
 import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Component

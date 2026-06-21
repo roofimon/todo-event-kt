@@ -1,6 +1,6 @@
-package com.example.eventdriven.domain.event
+package com.example.eventdriven.task.domain
 
-import com.example.eventdriven.domain.TaskStatus
+import com.example.eventdriven.infra.event.DomainEvent
 import java.time.Instant
 import java.util.UUID
 
