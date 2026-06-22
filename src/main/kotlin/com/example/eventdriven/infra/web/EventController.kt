@@ -23,7 +23,9 @@ class EventController(private val publisher: EventPublisher) {
             type = request.type,
             payload = request.payload,
         )
-        publisher.publish(event)
-        return ResponseEntity.status(HttpStatus.ACCEPTED).body(event)
+        return publisher.publish(event).fold(
+            { ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build() },
+            { ResponseEntity.status(HttpStatus.ACCEPTED).body(event) },
+        )
     }
 }
