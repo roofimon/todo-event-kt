@@ -14,7 +14,7 @@ class EventPublisher(
     @param:Value("\${app.messaging.routing-key}") private val routingKey: String,
 ) {
     fun publish(event: EventMessage): Either<MessagingError, Unit> =
-        lazyConnection.connect.value.flatMap {
+        lazyConnection.connect().flatMap {
             Either.catch { rabbitTemplate.convertAndSend(exchange, routingKey, event) }
                 .mapLeft { MessagingError.PublishFailed(event.id, it) }
         }

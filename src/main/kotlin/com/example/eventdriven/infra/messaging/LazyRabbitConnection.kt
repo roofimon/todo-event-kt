@@ -6,20 +6,18 @@ import org.springframework.amqp.rabbit.connection.ConnectionFactory
 import org.springframework.stereotype.Component
 
 /**
- * Models the RabbitMQ connection as a deferred effect. Reading [connect]`.value` is what
- * actually opens the broker connection — until then nothing connects, so the application
- * can boot without RabbitMQ being reachable.
+ * Models acquiring the RabbitMQ connection as a deferred effect: nothing connects
+ * until [connect] is invoked, so the application can boot without RabbitMQ reachable.
  *
- * `lazy { }` memoizes the result; the happy-path [Connection] is a caching proxy that
- * reconnects internally, so reuse is fine. Note: a failed first access caches the `Left`
- * permanently — use `LazyThreadSafetyMode.NONE` with a re-evaluating wrapper if
- * recover-on-retry is desired.
+ * Each invocation re-attempts the connection, so the publisher recovers automatically
+ * once the broker comes back (a failure is never cached). The live connection itself is
+ * cached by the underlying [ConnectionFactory] (a caching factory), so repeated calls are
+ * cheap once established and only actually reconnect when needed.
  */
 @Component
 class LazyRabbitConnection(private val connectionFactory: ConnectionFactory) {
 
-    val connect: Lazy<Either<MessagingError, Connection>> = lazy {
+    fun connect(): Either<MessagingError, Connection> =
         Either.catch { connectionFactory.createConnection() }
             .mapLeft { MessagingError.BrokerUnavailable(it) }
-    }
 }
