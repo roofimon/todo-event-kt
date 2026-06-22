@@ -31,7 +31,7 @@ data class Task(
 
     /** Returns the buffered events and clears the buffer (drain). */
     fun pullEvents(): List<DomainEvent> {
-        val drained = pendingEvents.toList()
+        val drained: List<DomainEvent> = pendingEvents.toList()
         pendingEvents.clear()
         return drained
     }
