@@ -7,6 +7,7 @@ export interface Task {
   title: string
   description: string | null
   status: TaskStatus
+  assigneeId: string | null
   createdAt: string
   updatedAt: string
 }
@@ -14,4 +15,10 @@ export interface Task {
 export interface CreateTaskRequest {
   title: string
   description?: string | null
+}
+
+export interface User {
+  id: string
+  name: string
+  email: string | null
 }

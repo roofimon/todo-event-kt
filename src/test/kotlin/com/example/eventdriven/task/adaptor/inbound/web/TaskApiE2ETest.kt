@@ -13,6 +13,7 @@ import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -71,6 +72,66 @@ class TaskApiE2ETest {
     }
 
     @Test
+    fun `assign and unassign a task to a seeded user over HTTP`() {
+        // a user can be selected from the seeded User table
+        val users = rest.getForEntity("/api/users", Array<UserResponse>::class.java)
+        assertEquals(HttpStatus.OK, users.statusCode)
+        val userId = assertNotNull(users.body?.firstOrNull()?.id, "expected at least one seeded user")
+
+        // create a task to assign
+        val created = rest.postForEntity(
+            "/api/tasks",
+            jsonEntity(mapOf("title" to "Assign over HTTP")),
+            TaskResponse::class.java,
+        )
+        val taskId = assertNotNull(created.body?.id)
+
+        // assign (Either Right path)
+        val assigned = rest.exchange(
+            "/api/tasks/{id}/assignee",
+            HttpMethod.PATCH,
+            jsonEntity(mapOf("assigneeId" to userId)),
+            TaskResponse::class.java,
+            taskId,
+        )
+        assertEquals(HttpStatus.OK, assigned.statusCode)
+        assertEquals(userId, assigned.body?.assigneeId)
+
+        // assigning a user that isn't in the table -> 422
+        val unknownUser = rest.exchange(
+            "/api/tasks/{id}/assignee",
+            HttpMethod.PATCH,
+            jsonEntity(mapOf("assigneeId" to UUID.randomUUID().toString())),
+            String::class.java,
+            taskId,
+        )
+        assertEquals(422, unknownUser.statusCode.value())
+
+        // unassign
+        val unassigned = rest.exchange(
+            "/api/tasks/{id}/assignee",
+            HttpMethod.DELETE,
+            null,
+            TaskResponse::class.java,
+            taskId,
+        )
+        assertEquals(HttpStatus.OK, unassigned.statusCode)
+        assertNull(unassigned.body?.assigneeId)
+    }
+
+    @Test
+    fun `assign unknown task id returns 404`() {
+        val response = rest.exchange(
+            "/api/tasks/{id}/assignee",
+            HttpMethod.PATCH,
+            jsonEntity(mapOf("assigneeId" to UUID.randomUUID().toString())),
+            String::class.java,
+            UUID.randomUUID(),
+        )
+        assertEquals(HttpStatus.NOT_FOUND, response.statusCode)
+    }
+
+    @Test
     fun `GET unknown id returns 404`() {
         val response = rest.getForEntity("/api/tasks/{id}", TaskResponse::class.java, UUID.randomUUID())
         assertEquals(HttpStatus.NOT_FOUND, response.statusCode)
@@ -94,4 +155,11 @@ data class TaskResponse(
     val title: String? = null,
     val description: String? = null,
     val status: String? = null,
+    val assigneeId: String? = null,
+)
+
+data class UserResponse(
+    val id: String? = null,
+    val name: String? = null,
+    val email: String? = null,
 )

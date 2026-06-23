@@ -8,4 +8,5 @@ import java.util.UUID
  */
 sealed interface TaskError {
     data class NotFound(val id: UUID) : TaskError
+    data class AssigneeNotFound(val userId: UUID) : TaskError
 }

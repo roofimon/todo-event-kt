@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { tasksApi } from './api/tasks'
-import type { Task, TaskStatus } from './types'
+import { usersApi } from './api/users'
+import type { Task, TaskStatus, User } from './types'
 import TaskForm from './components/TaskForm.vue'
 import TaskItem from './components/TaskItem.vue'
 
 const tasks = ref<Task[]>([])
+const users = ref<User[]>([])
 const error = ref<string | null>(null)
 const loading = ref(false)
 
@@ -18,6 +20,15 @@ async function load() {
     error.value = (e as Error).message
   } finally {
     loading.value = false
+  }
+}
+
+async function loadUsers() {
+  // Assignee options are best-effort; a failure here shouldn't block the task list.
+  try {
+    users.value = await usersApi.list()
+  } catch {
+    users.value = []
   }
 }
 
@@ -39,7 +50,28 @@ async function changeStatus(id: string, status: TaskStatus) {
   }
 }
 
-onMounted(load)
+async function assign(id: string, assigneeId: string) {
+  try {
+    const updated = await tasksApi.assign(id, assigneeId)
+    tasks.value = tasks.value.map((t) => (t.id === id ? updated : t))
+  } catch (e) {
+    error.value = (e as Error).message
+  }
+}
+
+async function unassign(id: string) {
+  try {
+    const updated = await tasksApi.unassign(id)
+    tasks.value = tasks.value.map((t) => (t.id === id ? updated : t))
+  } catch (e) {
+    error.value = (e as Error).message
+  }
+}
+
+onMounted(() => {
+  load()
+  loadUsers()
+})
 </script>
 
 <template>
@@ -58,7 +90,15 @@ onMounted(load)
     <p v-if="!tasks.length && !loading" class="empty">No tasks yet. Create one above.</p>
 
     <ul class="task-list">
-      <TaskItem v-for="task in tasks" :key="task.id" :task="task" @status-change="changeStatus" />
+      <TaskItem
+        v-for="task in tasks"
+        :key="task.id"
+        :task="task"
+        :users="users"
+        @status-change="changeStatus"
+        @assign="assign"
+        @unassign="unassign"
+      />
     </ul>
   </main>
 </template>

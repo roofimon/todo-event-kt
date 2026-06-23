@@ -20,6 +20,7 @@ data class Task(
     val title: String,
     val description: String? = null,
     val status: TaskStatus = TaskStatus.PENDING,
+    val assigneeId: UUID? = null,
     val createdAt: Instant = Instant.now(),
     val updatedAt: Instant = Instant.now(),
 ) {
@@ -44,6 +45,26 @@ data class Task(
         if (status == to) return this
         return copy(status = to, updatedAt = Instant.now())
             .also { it.record(TaskStatusChanged(taskId = id, from = status, to = to)) }
+    }
+
+    /**
+     * Assigns the task to [userId], recording a [TaskAssigned] event. Assigning
+     * to the current assignee is a no-op and raises no event.
+     */
+    fun assignTo(userId: UUID): Task {
+        if (assigneeId == userId) return this
+        return copy(assigneeId = userId, updatedAt = Instant.now())
+            .also { it.record(TaskAssigned(taskId = id, from = assigneeId, to = userId)) }
+    }
+
+    /**
+     * Clears the assignee, recording a [TaskUnassigned] event. Unassigning an
+     * already-unassigned task is a no-op and raises no event.
+     */
+    fun unassign(): Task {
+        val previous = assigneeId ?: return this
+        return copy(assigneeId = null, updatedAt = Instant.now())
+            .also { it.record(TaskUnassigned(taskId = id, from = previous)) }
     }
 
     companion object {

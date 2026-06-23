@@ -29,4 +29,16 @@ export const tasksApi = {
       body: JSON.stringify({ status }),
     }).then((r) => json<Task>(r))
   },
+
+  assign(id: string, assigneeId: string): Promise<Task> {
+    return fetch(`${BASE}/${id}/assignee`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ assigneeId }),
+    }).then((r) => json<Task>(r))
+  },
+
+  unassign(id: string): Promise<Task> {
+    return fetch(`${BASE}/${id}/assignee`, { method: 'DELETE' }).then((r) => json<Task>(r))
+  },
 }

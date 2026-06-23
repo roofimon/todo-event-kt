@@ -28,3 +28,24 @@ data class TaskStatusChanged(
     override val aggregateId: UUID get() = taskId
     override val type: String get() = "task.status-changed"
 }
+
+data class TaskAssigned(
+    val taskId: UUID,
+    val from: UUID?,
+    val to: UUID,
+    override val eventId: UUID = UUID.randomUUID(),
+    override val occurredAt: Instant = Instant.now(),
+) : TaskEvent {
+    override val aggregateId: UUID get() = taskId
+    override val type: String get() = "task.assigned"
+}
+
+data class TaskUnassigned(
+    val taskId: UUID,
+    val from: UUID,
+    override val eventId: UUID = UUID.randomUUID(),
+    override val occurredAt: Instant = Instant.now(),
+) : TaskEvent {
+    override val aggregateId: UUID get() = taskId
+    override val type: String get() = "task.unassigned"
+}

@@ -5,19 +5,32 @@ type Task = {
   title: string
   description: string | null
   status: string
+  assigneeId: string | null
   createdAt: string
   updatedAt: string
 }
 
+type User = { id: string; name: string; email: string | null }
+
+const DEFAULT_USERS: User[] = [
+  { id: 'user-alice', name: 'Alice', email: 'alice@example.com' },
+  { id: 'user-bob', name: 'Bob', email: 'bob@example.com' },
+]
+
 /**
- * Installs mock handlers for the Task API, backed by an in-memory list that
- * mutates like the real backend (create appends, status change updates). No
- * Spring Boot is required — Playwright intercepts the requests before they hit
- * the network/dev-proxy.
+ * Installs mock handlers for the Task + User API, backed by an in-memory list
+ * that mutates like the real backend (create appends, status/assignee updates).
+ * No Spring Boot is required — Playwright intercepts the requests before they
+ * hit the network/dev-proxy.
  */
-async function mockTaskApi(page: Page, initial: Task[] = []): Promise<void> {
+async function mockTaskApi(page: Page, initial: Task[] = [], users: User[] = DEFAULT_USERS): Promise<void> {
   const tasks: Task[] = initial.map((t) => ({ ...t }))
   let seq = tasks.length
+
+  // GET /api/users (seeded users that can be assigned)
+  await page.route('**/api/users', async (route) => {
+    await route.fulfill({ status: 200, json: users })
+  })
 
   // PATCH /api/tasks/{id}/status  (register the more specific route first)
   await page.route('**/api/tasks/*/status', async (route) => {
@@ -29,6 +42,28 @@ async function mockTaskApi(page: Page, initial: Task[] = []): Promise<void> {
       return
     }
     task.status = status
+    task.updatedAt = new Date().toISOString()
+    await route.fulfill({ status: 200, json: task })
+  })
+
+  // PATCH (assign) / DELETE (unassign) /api/tasks/{id}/assignee
+  await page.route('**/api/tasks/*/assignee', async (route) => {
+    const id = route.request().url().match(/\/api\/tasks\/([^/]+)\/assignee/)![1]
+    const task = tasks.find((t) => t.id === id)
+    if (!task) {
+      await route.fulfill({ status: 404, body: '' })
+      return
+    }
+    if (route.request().method() === 'DELETE') {
+      task.assigneeId = null
+    } else {
+      const { assigneeId } = route.request().postDataJSON() as { assigneeId: string }
+      if (!users.some((u) => u.id === assigneeId)) {
+        await route.fulfill({ status: 422, body: '' })
+        return
+      }
+      task.assigneeId = assigneeId
+    }
     task.updatedAt = new Date().toISOString()
     await route.fulfill({ status: 200, json: task })
   })
@@ -48,6 +83,7 @@ async function mockTaskApi(page: Page, initial: Task[] = []): Promise<void> {
         title: body.title,
         description: body.description ?? null,
         status: 'PENDING',
+        assigneeId: null,
         createdAt: now,
         updatedAt: now,
       }
@@ -66,6 +102,7 @@ function task(overrides: Partial<Task> = {}): Task {
     title: 'Existing task',
     description: null,
     status: 'PENDING',
+    assigneeId: null,
     createdAt: now,
     updatedAt: now,
     ...overrides,
@@ -121,6 +158,31 @@ test('changes a task status', async ({ page }) => {
 
   await expect(item.getByLabel('Status')).toHaveValue('DONE')
   await expect(item).toHaveClass(/status-done/)
+})
+
+test('assigns and unassigns a task to a user', async ({ page }) => {
+  await mockTaskApi(page, [task({ id: 'task-1', title: 'Assign me' })])
+  await page.goto('/')
+
+  const item = page.locator('li.task', { hasText: 'Assign me' })
+  const assignee = item.getByLabel('Assignee')
+  await expect(assignee).toHaveValue('')
+
+  // assign to Alice
+  await assignee.selectOption({ label: 'Alice' })
+  await expect(assignee).toHaveValue('user-alice')
+
+  // unassign
+  await assignee.selectOption({ label: 'Unassigned' })
+  await expect(assignee).toHaveValue('')
+})
+
+test('lists an existing assignee', async ({ page }) => {
+  await mockTaskApi(page, [task({ id: 'task-1', title: 'Owned', assigneeId: 'user-bob' })])
+  await page.goto('/')
+
+  const item = page.locator('li.task', { hasText: 'Owned' })
+  await expect(item.getByLabel('Assignee')).toHaveValue('user-bob')
 })
 
 test('shows an error when loading fails', async ({ page }) => {

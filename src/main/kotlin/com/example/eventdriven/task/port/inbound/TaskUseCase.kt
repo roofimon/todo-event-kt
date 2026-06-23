@@ -14,6 +14,8 @@ import java.util.UUID
 interface TaskUseCase {
     fun create(title: String, description: String? = null): Task
     fun changeStatus(id: UUID, to: TaskStatus): Either<TaskError, Task>
+    fun assign(id: UUID, assigneeId: UUID): Either<TaskError, Task>
+    fun unassign(id: UUID): Either<TaskError, Task>
     fun get(id: UUID): Option<Task>
     fun all(): List<Task>
 }

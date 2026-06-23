@@ -1,12 +1,23 @@
 <script setup lang="ts">
-import { TASK_STATUSES, type Task, type TaskStatus } from '../types'
+import { TASK_STATUSES, type Task, type TaskStatus, type User } from '../types'
 
-defineProps<{ task: Task }>()
-const emit = defineEmits<{ (e: 'status-change', id: string, status: TaskStatus): void }>()
+defineProps<{ task: Task; users: User[] }>()
+const emit = defineEmits<{
+  (e: 'status-change', id: string, status: TaskStatus): void
+  (e: 'assign', id: string, assigneeId: string): void
+  (e: 'unassign', id: string): void
+}>()
 
 function onChange(task: Task, event: Event) {
   const status = (event.target as HTMLSelectElement).value as TaskStatus
   if (status !== task.status) emit('status-change', task.id, status)
+}
+
+function onAssigneeChange(task: Task, event: Event) {
+  const assigneeId = (event.target as HTMLSelectElement).value
+  if (assigneeId === (task.assigneeId ?? '')) return
+  if (assigneeId === '') emit('unassign', task.id)
+  else emit('assign', task.id, assigneeId)
 }
 </script>
 
@@ -16,9 +27,19 @@ function onChange(task: Task, event: Event) {
       <span class="title">{{ task.title }}</span>
       <span v-if="task.description" class="description">{{ task.description }}</span>
     </div>
-    <select :value="task.status" @change="onChange(task, $event)" aria-label="Status">
-      <option v-for="s in TASK_STATUSES" :key="s" :value="s">{{ s }}</option>
-    </select>
+    <div class="controls">
+      <select
+        :value="task.assigneeId ?? ''"
+        @change="onAssigneeChange(task, $event)"
+        aria-label="Assignee"
+      >
+        <option value="">Unassigned</option>
+        <option v-for="u in users" :key="u.id" :value="u.id">{{ u.name }}</option>
+      </select>
+      <select :value="task.status" @change="onChange(task, $event)" aria-label="Status">
+        <option v-for="s in TASK_STATUSES" :key="s" :value="s">{{ s }}</option>
+      </select>
+    </div>
   </li>
 </template>
 
@@ -55,6 +76,10 @@ function onChange(task: Task, event: Event) {
 .description {
   font-size: 0.85rem;
   color: #616e7c;
+}
+.controls {
+  display: flex;
+  gap: 0.5rem;
 }
 select {
   padding: 0.35rem 0.5rem;

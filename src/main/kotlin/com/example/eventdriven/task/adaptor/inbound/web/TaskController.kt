@@ -1,10 +1,12 @@
 package com.example.eventdriven.task.adaptor.inbound.web
 
 import com.example.eventdriven.task.domain.Task
+import com.example.eventdriven.task.domain.TaskError
 import com.example.eventdriven.task.domain.TaskStatus
 import com.example.eventdriven.task.port.inbound.TaskUseCase
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -16,6 +18,7 @@ import java.util.UUID
 
 data class CreateTaskRequest(val title: String, val description: String? = null)
 data class ChangeStatusRequest(val status: TaskStatus)
+data class AssignRequest(val assigneeId: UUID)
 
 @RestController
 @RequestMapping("/api/tasks")
@@ -41,4 +44,23 @@ class TaskController(private val service: TaskUseCase) {
     ): ResponseEntity<Task> =
         service.changeStatus(id, request.status)
             .fold({ ResponseEntity.notFound().build() }, { ResponseEntity.ok(it) })
+
+    @PatchMapping("/{id}/assignee")
+    fun assign(
+        @PathVariable id: UUID,
+        @RequestBody request: AssignRequest,
+    ): ResponseEntity<Task> =
+        service.assign(id, request.assigneeId).fold(
+            { error ->
+                when (error) {
+                    is TaskError.AssigneeNotFound -> ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).build()
+                    else -> ResponseEntity.notFound().build()
+                }
+            },
+            { ResponseEntity.ok(it) },
+        )
+
+    @DeleteMapping("/{id}/assignee")
+    fun unassign(@PathVariable id: UUID): ResponseEntity<Task> =
+        service.unassign(id).fold({ ResponseEntity.notFound().build() }, { ResponseEntity.ok(it) })
 }
