@@ -10,13 +10,12 @@ import java.util.UUID
 
 /**
  * Outbound adapter backing [NotificationRepository] with the JPA `notifications`
- * table (H2), mapping between [NotificationEntity] and the [Notification] domain
- * model. Selected when `app.notification.repository=h2`; otherwise the in-memory
- * adapter is used.
+ * table, mapping between [NotificationEntity] and the [Notification] domain model.
+ * The default; selected unless `app.notification.repository=in-memory`.
  */
 @Repository
-@ConditionalOnProperty(name = ["app.notification.repository"], havingValue = "h2")
-class H2NotificationRepository(private val jpa: NotificationJpaRepository) : NotificationRepository {
+@ConditionalOnProperty(name = ["app.notification.repository"], havingValue = "jpa", matchIfMissing = true)
+class JpaNotificationRepository(private val jpa: NotificationJpaRepository) : NotificationRepository {
 
     override fun save(notification: Notification): Notification =
         jpa.save(NotificationEntity.fromDomain(notification)).toDomain()

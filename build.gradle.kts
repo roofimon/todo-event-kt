@@ -16,23 +16,18 @@ java {
 }
 
 repositories {
-	mavenLocal() // forked H2 build (github.com/roofimon/h2database) published locally
 	mavenCentral()
 }
 
-// Override the Spring Boot BOM-managed H2 version with the forked build.
-extra["h2.version"] = "2.4.240-roofimon"
-
 dependencies {
 	implementation("io.arrow-kt:arrow-core:2.1.2")
-	implementation("org.springframework.boot:spring-boot-h2console")
 	implementation("org.springframework.boot:spring-boot-starter-amqp")
 	implementation("org.springframework.boot:spring-boot-starter-data-jpa")
 	implementation("org.springframework.boot:spring-boot-starter-webmvc")
 	implementation("org.jetbrains.kotlin:kotlin-reflect")
 	implementation("tools.jackson.module:jackson-module-kotlin")
-	// Forked H2 build (github.com/roofimon/h2database)
-	runtimeOnly("com.h2database:h2")
+	runtimeOnly("org.postgresql:postgresql")
+	testRuntimeOnly("com.h2database:h2") // tests run on in-memory H2 (test profile)
 	testImplementation("org.springframework.boot:spring-boot-starter-amqp-test")
 	testImplementation("org.springframework.boot:spring-boot-resttestclient")
 	testImplementation("org.springframework.boot:spring-boot-restclient")
@@ -50,4 +45,5 @@ kotlin {
 
 tasks.withType<Test> {
 	useJUnitPlatform()
+	systemProperty("spring.profiles.active", "test") // tests use in-memory H2
 }

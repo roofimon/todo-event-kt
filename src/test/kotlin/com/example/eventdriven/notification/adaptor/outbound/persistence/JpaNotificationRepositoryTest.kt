@@ -9,24 +9,23 @@ import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import kotlin.test.assertTrue
 
 /**
- * Verifies the JPA-backed [H2NotificationRepository] adapter is selected when
- * `app.notification.repository=h2`, and that entity mapping (incl. the `is_read`
+ * Verifies the JPA-backed [JpaNotificationRepository] adapter is selected when
+ * `app.notification.repository=jpa`, and that entity mapping (incl. the `is_read`
  * column for the reserved word) and the derived findByRecipientId query work
- * through the [NotificationRepository] port.
+ * through the [NotificationRepository] port. Runs on H2 (test profile).
  */
 @SpringBootTest
-@TestPropertySource(properties = ["app.notification.repository=h2"])
-class H2NotificationRepositoryTest {
+@TestPropertySource(properties = ["app.notification.repository=jpa"])
+class JpaNotificationRepositoryTest {
 
     @Autowired
     lateinit var repository: NotificationRepository
 
     @Test
-    fun `the h2 adapter is wired when the property selects it`() {
-        assertIs<H2NotificationRepository>(repository)
+    fun `the jpa adapter is wired when the property selects it`() {
+        assertIs<JpaNotificationRepository>(repository)
     }
 
     @Test

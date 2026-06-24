@@ -1,11 +1,21 @@
--- Run lazily by H2 (via INIT in the JDBC URL) on the first physical connection,
--- so the schema and seed users are created on demand rather than at startup.
--- Idempotent (IF NOT EXISTS / MERGE) since H2 may run INIT per connection.
+-- Test-only H2 schema + seed, run lazily via H2 INIT on first connection.
+-- Idempotent (IF NOT EXISTS / MERGE) so it is safe when test contexts share the
+-- in-memory `eventdriven` database. Mirrors docker/postgres/init.sql.
 
 CREATE TABLE IF NOT EXISTS users (
     id    UUID PRIMARY KEY,
     name  VARCHAR(255) NOT NULL,
     email VARCHAR(255)
+);
+
+CREATE TABLE IF NOT EXISTS tasks (
+    id          UUID PRIMARY KEY,
+    title       VARCHAR(255) NOT NULL,
+    description VARCHAR(1000),
+    status      VARCHAR(32) NOT NULL,
+    assignee_id UUID,
+    created_at  TIMESTAMP(9) WITH TIME ZONE NOT NULL,
+    updated_at  TIMESTAMP(9) WITH TIME ZONE NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS notifications (
@@ -17,7 +27,6 @@ CREATE TABLE IF NOT EXISTS notifications (
     created_at   TIMESTAMP(9) WITH TIME ZONE
 );
 
--- Seed users (ids match UUID.nameUUIDFromBytes(name), as the former UserSeeder produced).
 MERGE INTO users (id, name, email) KEY(id) VALUES
     ('64489c85-dc2f-3078-bb85-cd87214b3810', 'Alice', 'alice@example.com'),
     ('2fc1c0be-b992-3d70-9697-5cfebf9d5c3b', 'Bob',   'bob@example.com'),

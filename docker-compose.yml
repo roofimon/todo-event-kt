@@ -1,0 +1,31 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: eventdriven-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: eventdriven
+      POSTGRES_USER: eventdriven
+      POSTGRES_PASSWORD: eventdriven
+    ports:
+      - "5432:5432"
+    volumes:
+      # Runs once on first container start (empty data dir): creates schema + seeds users.
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - postgres-data:/var/lib/postgresql/data
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: eventdriven-rabbitmq
+    restart: unless-stopped   # auto-recover a transient startup hiccup
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"    # AMQP
+      - "15672:15672"  # management UI (http://localhost:15672, guest/guest)
+    # No volume: a named volume on /var/lib/rabbitmq breaks the Erlang cookie perms,
+    # and broker state is disposable here (the app declares its exchange/queue lazily).
+
+volumes:
+  postgres-data:

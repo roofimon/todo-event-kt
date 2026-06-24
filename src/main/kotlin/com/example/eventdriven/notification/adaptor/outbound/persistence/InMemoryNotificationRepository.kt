@@ -9,12 +9,12 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Outbound adapter backing [NotificationRepository] with an in-memory map. The
- * default; selected unless `app.notification.repository=h2`, which activates
- * [H2NotificationRepository] instead.
+ * Outbound adapter backing [NotificationRepository] with an in-memory map.
+ * Selected when `app.notification.repository=in-memory`; otherwise the default
+ * [JpaNotificationRepository] is used.
  */
 @Repository
-@ConditionalOnProperty(name = ["app.notification.repository"], havingValue = "in-memory", matchIfMissing = true)
+@ConditionalOnProperty(name = ["app.notification.repository"], havingValue = "in-memory")
 class InMemoryNotificationRepository : NotificationRepository {
 
     private val store = ConcurrentHashMap<UUID, Notification>()
