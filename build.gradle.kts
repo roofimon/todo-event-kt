@@ -16,8 +16,12 @@ java {
 }
 
 repositories {
+	mavenLocal() // forked H2 build (github.com/roofimon/h2database) published locally
 	mavenCentral()
 }
+
+// Override the Spring Boot BOM-managed H2 version with the forked build.
+extra["h2.version"] = "2.4.240-roofimon"
 
 dependencies {
 	implementation("io.arrow-kt:arrow-core:2.1.2")
@@ -27,6 +31,7 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-webmvc")
 	implementation("org.jetbrains.kotlin:kotlin-reflect")
 	implementation("tools.jackson.module:jackson-module-kotlin")
+	// Forked H2 build (github.com/roofimon/h2database)
 	runtimeOnly("com.h2database:h2")
 	testImplementation("org.springframework.boot:spring-boot-starter-amqp-test")
 	testImplementation("org.springframework.boot:spring-boot-resttestclient")
