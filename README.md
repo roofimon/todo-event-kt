@@ -1,84 +1,106 @@
 # event-driven
 
-Spring Boot + Kotlin event-driven service skeleton.
+A Spring Boot + Kotlin event-driven service built with hexagonal architecture, functional
+error handling (Arrow), and **lazy ("connect on first use") connections** to both RabbitMQ and
+Postgres — the app boots even when neither is reachable.
 
-- **Spring Boot** 4.1.0 / **Kotlin** 2.3.21 / **Java** 21 (Gradle Kotlin DSL)
-- **Spring Web** (REST), **Spring AMQP** (RabbitMQ), **H2** (in-memory)
+- **Spring Boot** 4.1 / **Kotlin** 2.3 / **Java** 21 (Gradle Kotlin DSL)
+- **Spring Web** (REST), **Spring AMQP** (RabbitMQ), **Spring Data JPA**
+- **Arrow** `Either`/`Option` in ports and services (no exceptions across boundaries)
+- **Postgres** at runtime (Docker), **H2** in-memory for tests
+
+## Features
+
+Three feature modules, each hexagonal (`domain` / `port` / `application` / `adaptor`):
+
+- **task** — create tasks, change status, assign/unassign a user. In-memory repository. Raises
+  domain events (`TaskCreated`, `TaskStatusChanged`, `TaskAssigned`, `TaskUnassigned`).
+- **user** — a Postgres-backed user table, seeded with Alice/Bob/Carol. Tasks are assigned to a
+  user selected from it.
+- **notification** — created **event-driven**: a consumer on the internal bus reacts to
+  `TaskAssigned`/`TaskUnassigned` and records a notification for the affected user.
 
 ## Run
 
-Start RabbitMQ (e.g. via Docker):
+The app uses lazy connections, so it starts without RabbitMQ or Postgres up; each connects on first
+use. To exercise persistence and messaging, start the dependencies first:
 
 ```bash
-docker run -d --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3-management
+docker compose up -d        # postgres:17 (:5432) + rabbitmq:3-management (:5672, UI :15672)
 ```
 
-Then run the app:
+Postgres provisions the schema + seed users on first start; RabbitMQ is optional — domain events are
+republished to it, and the API degrades gracefully (logged warning) if it's down.
+
+**The app:**
 
 ```bash
-./gradlew bootRun
+./gradlew bootRun           # http://localhost:8080
 ```
 
-Connection settings are overridable via env vars: `RABBITMQ_HOST`, `RABBITMQ_PORT`,
-`RABBITMQ_USER`, `RABBITMQ_PASSWORD` (defaults: `localhost:5672`, `guest`/`guest`).
+RabbitMQ settings are overridable via `RABBITMQ_HOST`/`RABBITMQ_PORT`/`RABBITMQ_USER`/`RABBITMQ_PASSWORD`
+(defaults `localhost:5672`, `guest`/`guest`).
 
-## Try the event flow
+## REST API
 
-Publish an event over REST; it is sent to the `events.exchange` topic exchange,
-routed to `events.queue`, and logged by `EventListener`:
+**Tasks**
 
 ```bash
-curl -X POST http://localhost:8080/api/events \
-  -H 'Content-Type: application/json' \
+curl -X POST localhost:8080/api/tasks -H 'Content-Type: application/json' \
+  -d '{"title":"write docs","description":"the README"}'
+curl localhost:8080/api/tasks
+curl localhost:8080/api/tasks/{id}
+curl -X PATCH localhost:8080/api/tasks/{id}/status   -H 'Content-Type: application/json' -d '{"status":"IN_PROGRESS"}'
+curl -X PATCH localhost:8080/api/tasks/{id}/assignee -H 'Content-Type: application/json' -d '{"assigneeId":"<user-id>"}'
+curl -X DELETE localhost:8080/api/tasks/{id}/assignee     # unassign
+```
+
+Assigning to a user not in the table → `422`. Unknown task → `404`.
+
+**Users / Notifications**
+
+```bash
+curl localhost:8080/api/users                                   # pick an id to assign
+curl 'localhost:8080/api/notifications?recipientId=<user-id>'   # notifications for a user
+curl -X PATCH localhost:8080/api/notifications/{id}/read        # mark read
+```
+
+Assigning a task to a user creates a `task.assigned` notification for them; unassigning creates a
+`task.unassigned` one — visible immediately via the notifications endpoint.
+
+**Standalone AMQP demo** — publish straight to RabbitMQ (independent of the domain-event flow):
+
+```bash
+curl -X POST localhost:8080/api/events -H 'Content-Type: application/json' \
   -d '{"type":"order.created","payload":"order-42"}'
 ```
 
-Watch the app log for: `Received event: id=..., type=order.created, payload=order-42`.
+## Event flow
 
-## Domain events
-
-The `Task` aggregate raises domain events that flow through an internal,
-in-process bus — no broker involved:
+Domain events flow in-process through an internal bus to several independent consumers:
 
 ```
-TaskService.create() / changeStatus()
-    → DomainEventBus.publish(TaskCreated | TaskStatusChanged)   [internal bus]
-    → SpringDomainEventBus (ApplicationEventPublisher)
-    → DomainEventLogConsumer.@EventListener
-    → logs/domain-events.log                                    [consumer: file only]
+TaskService.assign() / changeStatus() / ...
+  → DomainEventBus.publish(TaskAssigned | TaskStatusChanged | ...)     [internal bus]
+  → SpringDomainEventBus (ApplicationEventPublisher)
+      ├─ DomainEventLogConsumer          → logs/domain-events.log
+      ├─ DomainEventRabbitPublisher      → RabbitMQ events.exchange     [lazy connection]
+      └─ TaskEventNotificationConsumer   → creates a Notification
 ```
 
-The consumer's sole job is to append each event to `logs/domain-events.log`
-(configured in `logback-spring.xml`, `additivity="false"` so events do not go
-to the console). Exercise it via the Task endpoints and tail the file:
+`logs/domain-events.log` is configured in `logback-spring.xml` (`additivity="false"`, so events
+don't hit the console). Tail it while hitting the Task endpoints.
 
-```bash
-curl -X POST http://localhost:8080/api/tasks \
-  -H 'Content-Type: application/json' -d '{"title":"write docs"}'
-tail -f logs/domain-events.log
-```
+## Lazy connections
 
-> The standalone RabbitMQ demo (`/api/events`) is independent and still uses the
-> broker; only the Task domain-event path was switched to the log-file consumer.
+Both external connections are deferred so the app boots with **zero** connections:
 
-## Other endpoints
-
-- H2 console: http://localhost:8080/h2-console (JDBC URL `jdbc:h2:mem:eventdriven`, user `sa`)
-- RabbitMQ management UI: http://localhost:15672 (guest/guest)
-
-## Layout
-
-```
-src/main/kotlin/com/example/eventdriven/
-├── EventDrivenApplication.kt   # entry point
-├── messaging/
-│   ├── EventMessage.kt          # the event payload (JSON over AMQP)
-│   ├── MessagingConfig.kt       # exchange, queue, binding, JSON converter
-│   ├── EventPublisher.kt        # convertAndSend wrapper
-│   └── EventListener.kt         # @RabbitListener consumer
-└── web/
-    └── EventController.kt        # POST /api/events -> publish
-```
+- **RabbitMQ** — `LazyRabbitConnection` defers `createConnection()`; the listener's auto-startup is
+  off. The first publish connects; a broker outage is a logged warning, not a failure.
+- **Postgres** — `LazyConnectionDataSourceProxy` + Hikari `minimum-idle=0` + `ddl-auto=none` +
+  Hibernate boot metadata access disabled. The schema/seed are provisioned by the Postgres container
+  (`docker/postgres/init.sql`), so the app opens its first DB connection only on the first repository
+  call.
 
 ## Build & test
 
@@ -86,27 +108,44 @@ src/main/kotlin/com/example/eventdriven/
 ./gradlew build
 ```
 
+Tests run on in-memory **H2** via the `test` Spring profile (`src/test/resources/application-test.properties`)
+— no Docker required. Coverage includes domain unit tests and full-stack REST E2E tests
+(`TaskApiE2ETest`, `NotificationApiE2ETest`).
+
+Notification storage is switchable: `app.notification.repository=jpa` (default, Postgres) or
+`in-memory`.
+
+## Layout
+
+```
+src/main/kotlin/com/example/eventdriven/
+├── task/            # feature: domain / port.{inbound,outbound} / application / adaptor.{inbound.web,outbound}
+├── user/            # feature: Postgres-backed user directory
+├── notification/    # feature: event-driven notifications (JPA or in-memory)
+└── infra/
+    ├── event/         # DomainEvent, DomainEventBus, SpringDomainEventBus (internal bus)
+    ├── eventlog/      # DomainEventLogConsumer → log file
+    ├── integration/   # DomainEventRabbitPublisher → RabbitMQ
+    ├── messaging/     # RabbitMQ config, lazy connection, EventPublisher/Listener, /api/events
+    ├── persistence/   # LazyDataSourceConfig (lazy Postgres connection)
+    └── web/           # EventController (standalone AMQP demo)
+
+docker-compose.yml          # Postgres + init.sql (schema & seed)
+docker/postgres/init.sql
+```
+
 ## Frontend (Vue 3 + TypeScript)
 
-A Vite-based web UI lives in `frontend/`. It lists tasks, creates them, and
-changes their status — each action hits the Task REST API and triggers a
-domain event on the backend.
+A Vite web UI in `frontend/` lists tasks, creates them, changes status, and **assigns a user**
+(dropdown populated from `/api/users`). Each action hits the REST API and triggers the domain-event
+flow.
 
 ```bash
 cd frontend
 npm install
-npm run dev      # http://localhost:5173 (proxies /api -> http://localhost:8080)
+npm run dev        # http://localhost:5173 (proxies /api -> http://localhost:8080)
+npm run build      # type-check + production build
+npm run test:e2e   # Playwright tests (mock the API)
 ```
 
-Run the Spring Boot app (`./gradlew bootRun`) alongside it. Other scripts:
-`npm run build` (type-check + production build to `dist/`), `npm run type-check`.
-
-```
-frontend/src/
-├── App.vue                 # page shell, loads/creates/updates tasks
-├── api/tasks.ts            # typed fetch client for /api/tasks
-├── types.ts                # Task / TaskStatus mirrors of the backend model
-└── components/
-    ├── TaskForm.vue        # create-task form
-    └── TaskItem.vue        # task row with status selector
-```
+Run the backend (`./gradlew bootRun`) alongside it.
