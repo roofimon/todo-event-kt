@@ -26,9 +26,13 @@ class LazyDataSourceConfig {
     fun realDataSource(properties: DataSourceProperties): HikariDataSource =
         properties.initializeDataSourceBuilder().type(HikariDataSource::class.java).build()
 
-    /** Defers acquiring a physical connection until a statement is actually executed. */
+    /**
+     * Defers acquiring a physical connection until a statement is actually executed.
+     * `defaultAutoCommit` is set so the proxy doesn't open an extra probe connection
+     * to discover it — important when the DB is down, so failure isn't paid twice.
+     */
     @Bean
     @Primary
     fun dataSource(realDataSource: HikariDataSource): DataSource =
-        LazyConnectionDataSourceProxy(realDataSource)
+        LazyConnectionDataSourceProxy(realDataSource).apply { setDefaultAutoCommit(true) }
 }
