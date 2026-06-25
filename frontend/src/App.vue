@@ -1,71 +1,66 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { Effect, Option } from 'effect'
+import { computed, onMounted, ref } from 'vue'
 import { tasksApi } from './api/tasks'
 import { usersApi } from './api/users'
+import type { ApiError } from './api/http'
 import type { Task, TaskStatus, User } from './types'
 import TaskForm from './components/TaskForm.vue'
 import TaskItem from './components/TaskItem.vue'
 
 const tasks = ref<Task[]>([])
 const users = ref<User[]>([])
-const error = ref<string | null>(null)
+const error = ref<Option.Option<string>>(Option.none())
 const loading = ref(false)
 
-async function load() {
+const errorText = computed(() => Option.getOrUndefined(error.value))
+
+const fail = (e: ApiError) => {
+  error.value = Option.some(e.message)
+}
+
+/** Replaces the task with the same id with the server's updated copy. */
+const replaceTask = (updated: Task) => {
+  tasks.value = tasks.value.map((t) => (t.id === updated.id ? updated : t))
+}
+
+function load() {
   loading.value = true
-  error.value = null
-  try {
-    tasks.value = await tasksApi.list()
-  } catch (e) {
-    error.value = (e as Error).message
-  } finally {
-    loading.value = false
-  }
+  error.value = Option.none()
+  Effect.runPromise(
+    tasksApi.list().pipe(Effect.match({ onFailure: fail, onSuccess: (t) => (tasks.value = t) })),
+  ).finally(() => (loading.value = false))
 }
 
-async function loadUsers() {
+function loadUsers() {
   // Assignee options are best-effort; a failure here shouldn't block the task list.
-  try {
-    users.value = await usersApi.list()
-  } catch {
-    users.value = []
-  }
+  Effect.runPromise(
+    usersApi.list().pipe(Effect.match({ onFailure: () => (users.value = []), onSuccess: (u) => (users.value = u) })),
+  )
 }
 
-async function createTask(payload: { title: string; description: string | null }) {
-  try {
-    const created = await tasksApi.create(payload)
-    tasks.value = [...tasks.value, created]
-  } catch (e) {
-    error.value = (e as Error).message
-  }
+function createTask(payload: { title: string; description: Option.Option<string> }) {
+  Effect.runPromise(
+    tasksApi.create(payload).pipe(
+      Effect.match({ onFailure: fail, onSuccess: (created) => (tasks.value = [...tasks.value, created]) }),
+    ),
+  )
 }
 
-async function changeStatus(id: string, status: TaskStatus) {
-  try {
-    const updated = await tasksApi.changeStatus(id, status)
-    tasks.value = tasks.value.map((t) => (t.id === id ? updated : t))
-  } catch (e) {
-    error.value = (e as Error).message
-  }
+function changeStatus(id: string, status: TaskStatus) {
+  Effect.runPromise(
+    tasksApi.changeStatus(id, status).pipe(Effect.match({ onFailure: fail, onSuccess: replaceTask })),
+  )
 }
 
-async function assign(id: string, assigneeId: string) {
-  try {
-    const updated = await tasksApi.assign(id, assigneeId)
-    tasks.value = tasks.value.map((t) => (t.id === id ? updated : t))
-  } catch (e) {
-    error.value = (e as Error).message
-  }
+function assign(id: string, assigneeId: string) {
+  Effect.runPromise(
+    tasksApi.assign(id, assigneeId).pipe(Effect.match({ onFailure: fail, onSuccess: replaceTask })),
+  )
 }
 
-async function unassign(id: string) {
-  try {
-    const updated = await tasksApi.unassign(id)
-    tasks.value = tasks.value.map((t) => (t.id === id ? updated : t))
-  } catch (e) {
-    error.value = (e as Error).message
-  }
+function unassign(id: string) {
+  Effect.runPromise(tasksApi.unassign(id).pipe(Effect.match({ onFailure: fail, onSuccess: replaceTask })))
 }
 
 onMounted(() => {
@@ -85,7 +80,7 @@ onMounted(() => {
 
     <TaskForm @create="createTask" />
 
-    <p v-if="error" class="error">⚠️ {{ error }}</p>
+    <p v-if="errorText" class="error">⚠️ {{ errorText }}</p>
 
     <p v-if="!tasks.length && !loading" class="empty">No tasks yet. Create one above.</p>
 

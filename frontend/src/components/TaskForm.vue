@@ -1,7 +1,10 @@
 <script setup lang="ts">
+import { Option } from 'effect'
 import { ref } from 'vue'
 
-const emit = defineEmits<{ (e: 'create', payload: { title: string; description: string | null }): void }>()
+const emit = defineEmits<{
+  (e: 'create', payload: { title: string; description: Option.Option<string> }): void
+}>()
 
 const title = ref('')
 const description = ref('')
@@ -9,7 +12,10 @@ const description = ref('')
 function submit() {
   const t = title.value.trim()
   if (!t) return
-  emit('create', { title: t, description: description.value.trim() || null })
+  emit('create', {
+    title: t,
+    description: Option.liftPredicate(description.value.trim(), (s) => s.length > 0),
+  })
   title.value = ''
   description.value = ''
 }

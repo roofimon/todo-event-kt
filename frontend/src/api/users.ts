@@ -1,16 +1,17 @@
+import { Effect, Option } from 'effect'
 import type { User } from '../types'
+import { type ApiError, request } from './http'
 
-const BASE = '/api/users'
-
-async function json<T>(res: Response): Promise<T> {
-  if (!res.ok) {
-    throw new Error(`${res.status} ${res.statusText}`)
-  }
-  return res.json() as Promise<T>
+/** Raw JSON shape from the backend (email is nullable on the wire). */
+interface RawUser {
+  id: string
+  name: string
+  email: string | null
 }
 
+const toUser = (r: RawUser): User => ({ ...r, email: Option.fromNullable(r.email) })
+
 export const usersApi = {
-  list(): Promise<User[]> {
-    return fetch(BASE).then((r) => json<User[]>(r))
-  },
+  list: (): Effect.Effect<User[], ApiError> =>
+    request<RawUser[]>('/api/users').pipe(Effect.map((rs) => rs.map(toUser))),
 }

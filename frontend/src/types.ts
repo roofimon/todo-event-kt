@@ -1,3 +1,5 @@
+import type { Option } from 'effect'
+
 export type TaskStatus = 'PENDING' | 'IN_PROGRESS' | 'DONE' | 'CANCELLED'
 
 export const TASK_STATUSES: TaskStatus[] = ['PENDING', 'IN_PROGRESS', 'DONE', 'CANCELLED']
@@ -5,20 +7,20 @@ export const TASK_STATUSES: TaskStatus[] = ['PENDING', 'IN_PROGRESS', 'DONE', 'C
 export interface Task {
   id: string
   title: string
-  description: string | null
+  description: Option.Option<string>
   status: TaskStatus
-  assigneeId: string | null
+  assigneeId: Option.Option<string>
   createdAt: string
   updatedAt: string
 }
 
 export interface CreateTaskRequest {
   title: string
-  description?: string | null
+  description: Option.Option<string>
 }
 
 export interface User {
   id: string
   name: string
-  email: string | null
+  email: Option.Option<string>
 }

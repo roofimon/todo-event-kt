@@ -1,12 +1,18 @@
 <script setup lang="ts">
+import { Option } from 'effect'
+import { computed } from 'vue'
 import { TASK_STATUSES, type Task, type TaskStatus, type User } from '../types'
 
-defineProps<{ task: Task; users: User[] }>()
+const props = defineProps<{ task: Task; users: User[] }>()
 const emit = defineEmits<{
   (e: 'status-change', id: string, status: TaskStatus): void
   (e: 'assign', id: string, assigneeId: string): void
   (e: 'unassign', id: string): void
 }>()
+
+const description = computed(() => Option.getOrUndefined(props.task.description))
+// The <select> needs a string value; '' is the DOM representation of "Unassigned".
+const selectedAssignee = computed(() => Option.getOrElse(props.task.assigneeId, () => ''))
 
 function onChange(task: Task, event: Event) {
   const status = (event.target as HTMLSelectElement).value as TaskStatus
@@ -15,8 +21,8 @@ function onChange(task: Task, event: Event) {
 
 function onAssigneeChange(task: Task, event: Event) {
   const assigneeId = (event.target as HTMLSelectElement).value
-  if (assigneeId === (task.assigneeId ?? '')) return
-  if (assigneeId === '') emit('unassign', task.id)
+  if (assigneeId === Option.getOrElse(task.assigneeId, () => '')) return
+  if (assigneeId.length === 0) emit('unassign', task.id)
   else emit('assign', task.id, assigneeId)
 }
 </script>
@@ -25,11 +31,11 @@ function onAssigneeChange(task: Task, event: Event) {
   <li class="task" :class="`status-${task.status.toLowerCase()}`">
     <div class="main">
       <span class="title">{{ task.title }}</span>
-      <span v-if="task.description" class="description">{{ task.description }}</span>
+      <span v-if="description" class="description">{{ description }}</span>
     </div>
     <div class="controls">
       <select
-        :value="task.assigneeId ?? ''"
+        :value="selectedAssignee"
         @change="onAssigneeChange(task, $event)"
         aria-label="Assignee"
       >
