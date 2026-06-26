@@ -8,13 +8,16 @@ Postgres — the app boots even when neither is reachable.
 - **Spring Web** (REST), **Spring AMQP** (RabbitMQ), **Spring Data JPA**
 - **Arrow** `Either`/`Option` in ports and services (no exceptions across boundaries)
 - **Postgres** at runtime (Docker), **H2** in-memory for tests
+- **Gatling** load test (`./gradlew gatlingRun`)
+- Vue 3 + TypeScript frontend using **Effect-TS** (`frontend/`)
 
 ## Features
 
 Three feature modules, each hexagonal (`domain` / `port` / `application` / `adaptor`):
 
-- **task** — create tasks, change status, assign/unassign a user. In-memory repository. Raises
-  domain events (`TaskCreated`, `TaskStatusChanged`, `TaskAssigned`, `TaskUnassigned`).
+- **task** — create tasks, change status, assign/unassign a user. Postgres-backed (JPA) by default,
+  switchable to in-memory via `app.task.repository=in-memory`. Raises domain events (`TaskCreated`,
+  `TaskStatusChanged`, `TaskAssigned`, `TaskUnassigned`).
 - **user** — a Postgres-backed user table, seeded with Alice/Bob/Carol. Tasks are assigned to a
   user selected from it.
 - **notification** — created **event-driven**: a consumer on the internal bus reacts to
@@ -112,8 +115,23 @@ Tests run on in-memory **H2** via the `test` Spring profile (`src/test/resources
 — no Docker required. Coverage includes domain unit tests and full-stack REST E2E tests
 (`TaskApiE2ETest`, `NotificationApiE2ETest`).
 
-Notification storage is switchable: `app.notification.repository=jpa` (default, Postgres) or
-`in-memory`.
+Task and notification storage are switchable: `app.task.repository` / `app.notification.repository`
+= `jpa` (default, Postgres) or `in-memory`.
+
+## Load test
+
+A Gatling simulation (`src/gatling/kotlin/.../ApiSimulation.kt`) drives a realistic task lifecycle
+(list users → create → get → change status → assign → notifications → list) under an open-model
+arrival rate, asserting p95 latency and error rate.
+
+```bash
+docker compose up -d        # Postgres + RabbitMQ
+./gradlew bootRun           # in another shell
+./gradlew gatlingRun        # BASE_URL=http://host:port to retarget
+```
+
+Reports land in `build/reports/gatling/`. Note: write endpoints have a ~1s latency floor because
+`DomainEventLogConsumer` does a synchronous `Thread.sleep(1000)` per domain event (a demo artifact).
 
 ## Layout
 
@@ -128,9 +146,10 @@ src/main/kotlin/com/example/eventdriven/
     ├── integration/   # DomainEventRabbitPublisher → RabbitMQ
     ├── messaging/     # RabbitMQ config, lazy connection, EventPublisher/Listener, /api/events
     ├── persistence/   # LazyDataSourceConfig (lazy Postgres connection)
-    └── web/           # EventController (standalone AMQP demo)
+    └── web/           # EventController + DataAccessExceptionHandler (DB-down -> 503)
 
-docker-compose.yml          # Postgres + init.sql (schema & seed)
+src/gatling/kotlin/...      # ApiSimulation — Gatling API load test
+docker-compose.yml          # Postgres + init.sql (schema & seed) + RabbitMQ
 docker/postgres/init.sql
 ```
 
@@ -138,7 +157,9 @@ docker/postgres/init.sql
 
 A Vite web UI in `frontend/` lists tasks, creates them, changes status, and **assigns a user**
 (dropdown populated from `/api/users`). Each action hits the REST API and triggers the domain-event
-flow.
+flow. The API client is built with **Effect-TS** (`Effect.Effect<A, ApiError>`, run via
+`Effect.runPromise`/`match`), and optional values use `Option` instead of `null`/`''` — mirroring
+the backend's functional style.
 
 ```bash
 cd frontend
